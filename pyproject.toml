@@ -1,0 +1,29 @@
+[project]
+name = "autoresearch-starter"
+version = "0.1.0"
+description = "Student starter kit: run your own LLM pretraining experiments on a single consumer GPU and beat the baseline"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+    "matplotlib>=3.10.8",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3",
+    "pyarrow>=21.0.0",
+    "requests>=2.32.0",
+    "rustbpe>=0.1.0",
+    "tiktoken>=0.11.0",
+    "torch==2.9.1",
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu128" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

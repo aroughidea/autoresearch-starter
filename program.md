@@ -1,0 +1,119 @@
+# autoresearch
+
+This is an experiment to have the LLM do its own research.
+
+## Setup
+
+To set up a new experiment, work with the user to:
+
+1. **Agree on a run tag**: propose a tag based on today's date (e.g. `may22-am`) and use it in commit messages/tags for milestones.
+2. **Use the main line**: stay on `master` for day-to-day experiments; do not create per-run branches.
+3. **Read the in-scope files**: The repo is small. Read these files for full context:
+   - `README.md` — repository context.
+   - `prepare.py` — fixed constants, data prep, tokenizer, dataloader, evaluation. Do not modify.
+   - `train.py` — the file you modify. Model architecture, optimizer, training loop.
+4. **Verify data exists**: Check the autoresearch cache directory. On Windows this is `%LOCALAPPDATA%\autoresearch` (e.g. `C:\Users\<you>\AppData\Local\autoresearch`) — unless `AUTORESEARCH_CACHE_DIR` is set, or a legacy `~/.cache/autoresearch` directory already exists (resolution order is defined in `_default_cache_dir()` in `prepare.py`). It should contain: `datasets\<dataset>\data\` with the downloaded parquet file (default: `tinystories_gpt4_clean.parquet` — the data stays as a single parquet file; there are no pre-tokenized shards), `datasets\<dataset>\tokenizer\` with `tokenizer.pkl` and `token_bytes.pt`, and `active_dataset.txt` at the cache root. If any of these are missing, tell the human to run `uv run prepare.py`.
+5. **Initialize results.tsv**: If `results.tsv` does not already exist, create it with just the header row. If it already exists, leave it untouched — it contains the prior experiment history and the agent will continue appending to it. The baseline will be recorded after the first run (or the next run, if resuming).
+6. **Confirm and go**: Confirm setup looks good.
+
+Note: the Windows fork supports NVIDIA GPUs that meet the VRAM floor, including laptop and mobile workstation GPUs. Strong laptop hardware should be described as supported when it meets the floor, while still acknowledging that thermals and power limits can reduce throughput.
+
+Once you get confirmation, kick off the experimentation.
+
+## Experimentation
+
+Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
+
+**What you CAN do:**
+- Modify `train.py` — this is the only file you edit. Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
+
+**What you CANNOT do:**
+- Modify `prepare.py`. It is read-only. It contains the fixed evaluation, data loading, tokenizer, and training constants (time budget, sequence length, etc).
+- Install new packages or add dependencies. You can only use what's already in `pyproject.toml`.
+- Modify the evaluation harness. The `evaluate_bpb` function in `prepare.py` is the ground truth metric.
+
+**The goal is simple: get the lowest val_bpb.** Since the time budget is fixed, you don't need to worry about training time — it's always 5 minutes. Everything is fair game: change the architecture, the optimizer, the hyperparameters, the batch size, the model size. The only constraint is that the code runs without crashing and finishes within the time budget.
+
+**VRAM** is a soft constraint. Some increase is acceptable for meaningful val_bpb gains, but it should not blow up dramatically.
+
+**Simplicity criterion**: All else being equal, simpler is better. A small improvement that adds ugly complexity is not worth it. Conversely, removing something and getting equal or better results is a great outcome — that's a simplification win. When evaluating whether to keep a change, weigh the complexity cost against the improvement magnitude. A 0.001 val_bpb improvement that adds 20 lines of hacky code? Probably not worth it. A 0.001 val_bpb improvement from deleting code? Definitely keep. An improvement of ~0 but much simpler code? Keep.
+
+**The first run**: Your very first run should always be to establish the baseline, so you will run the training script as is.
+
+## Output format
+
+Once the script finishes it prints a summary like this:
+
+```
+---
+val_bpb:          0.997900
+training_seconds: 300.1
+total_seconds:    325.9
+peak_vram_mb:     45060.2
+mfu_percent:      39.80
+total_tokens_M:   499.6
+num_steps:        953
+num_params_M:     50.3
+depth:            8
+```
+
+Note that the script is configured to always stop after 5 minutes, so depending on the computing platform of this computer the numbers might look different. You can extract the key metric from the log file:
+
+```
+grep "^val_bpb:" run.log
+```
+
+## Logging results
+
+When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-separated — commas break in descriptions).
+
+The TSV has a header row and 6 columns:
+
+```
+timestamp	commit	val_bpb	memory_gb	status	description
+```
+
+1. timestamp in ISO-8601 format (use commit time), e.g. `2026-05-21T19:59:30-07:00`
+2. git commit hash (short, 7 chars)
+3. val_bpb achieved (e.g. 1.234567) — use 0.000000 for crashes
+4. peak memory in GB, round to .1f (e.g. 12.3 — divide peak_vram_mb by 1024) — use 0.0 for crashes
+5. status: `keep`, `discard`, or `crash`
+6. short text description of what this experiment tried
+
+Example:
+
+```
+timestamp	commit	val_bpb	memory_gb	status	description
+2026-05-21T19:55:10-07:00	a1b2c3d	0.997900	44.0	keep	baseline
+2026-05-21T20:03:42-07:00	b2c3d4e	0.993200	44.2	keep	increase LR to 0.04
+2026-05-21T20:12:07-07:00	c3d4e5f	1.005000	44.0	discard	switch to GeLU activation
+2026-05-21T20:19:31-07:00	d4e5f6g	0.000000	0.0	crash	double model width (OOM)
+```
+
+## The experiment loop
+
+The experiment runs on the main line (`master`).
+
+LOOP FOREVER:
+
+1. Note the current commit hash (call it START).
+2. Tune `train.py` with an experimental idea by directly hacking the code.
+3. git commit
+4. Run the experiment: `uv run train.py > run.log 2>&1` (redirect everything — do NOT use tee or let output flood your context)
+5. Read out the results: `grep "^val_bpb:\|^peak_vram_mb:" run.log`
+6. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the Python stack trace and attempt a fix. If you can't get things to work after more than a few attempts, give up.
+7. If val_bpb improved (lower): archive the checkpoint by copying `checkpoint_pre_eval.pt` to `checkpoints/<timestamp>_<commit>.pt` (create `checkpoints/` if needed). Status = `keep`. Archived checkpoints stay LOCAL-ONLY: checkpoints are large binaries and are .gitignored — your scoreboard and code history are the shareable record, and any checkpoint can be regenerated by checking out its commit and re-running training (~5 minutes). The `<timestamp>` in the checkpoint FILENAME must use the compact, colon-free form `YYYYMMDDTHHMMSS-ZZZZ` (e.g. `20260523T155743-0700` → `checkpoints/20260523T155743-0700_75027e8.pt`). NEVER put extended ISO-8601 with colons (e.g. `2026-05-23T15:57:43-07:00`) in a filename: colons are invalid in Windows filenames and have produced mangled Unicode filenames in a past session. This rule applies only to filenames — the `results.tsv` timestamp column keeps the colon form described under Logging results, because it is file content, not a filename.
+8. If val_bpb is equal or worse: `git reset --hard START` to undo the step 3 commit. Status = `discard`.
+9. Record the result in results.tsv, then commit it: `git add results.tsv && git commit -m "log: <description> <status>"`. Do this AFTER any git reset so the TSV update is never undone.
+10. Keep-only policy: only `keep` runs get archived checkpoints.
+11. No cleanup policy: never delete archived checkpoints from `checkpoints/`.
+
+The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the main line so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
+
+**Timeout**: Each experiment trains for ~5 minutes, plus startup and the fixed validation eval — on consumer GPUs the eval alone can add 2–3 minutes, so a healthy run can total 8–9 minutes (`total_seconds` in the summary tells you exactly). If a run exceeds 10 minutes, kill it and treat it as a failure (discard and revert).
+
+**Crashes**: If a run crashes (OOM, or a bug, or etc.), use your judgment: If it's something dumb and easy to fix (e.g. a typo, a missing import), fix it and re-run. If the idea itself is fundamentally broken, just skip it, log "crash" as the status in the tsv, and move on.
+
+**NEVER STOP**: Once the experiment loop has begun (after the initial setup), do NOT pause to ask the human if you should continue. Do NOT ask "should I keep going?" or "is this a good stopping point?". The human might be asleep, or gone from a computer and expects you to continue working *indefinitely* until you are manually stopped. You are autonomous. If you run out of ideas, think harder — re-read the in-scope files for new angles, revisit the results.tsv history for unexplored directions, try combining previous near-misses, try more radical architectural changes. The loop runs until the human interrupts you, period.
+
+As an example use case, a user might leave you running while they sleep. If each experiment takes you ~5 minutes then you can run approx 12/hour, for a total of about 100 over the duration of the average human sleep. The user then wakes up to experimental results, all completed by you while they slept!

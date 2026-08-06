@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Model checkpoints/artifacts (local-only; regenerate by re-running training)
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+
+# Run logs
+*.log
+
+# Local agent permissions
+.claude/settings.local.json
