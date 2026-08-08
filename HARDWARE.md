@@ -9,6 +9,8 @@ You do not need a specific machine to do this project — you need to pick the r
 | [3. No GPU](#3-no-gpu-at-all--the-colab-path) | Any laptop + browser | Free | No (1–3 h sessions) |
 | [4. Rented GPU pod](#4-overnight-autonomy-without-local-hardware--rent-a-pod) | Any laptop + ~$5–10 | ~$0.20–0.60/hr | Yes |
 
+**One thing the table doesn't have to cover: serving.** All four rows are about *training*, which is where the hardware requirements live. Running the finished model is cheap on every path — these models are ~19M parameters, so `chat.py` serves them on a plain CPU with no GPU anywhere in the picture. The existence proof is the live demo, [autoresearch-demo.fly.dev](https://autoresearch-demo.fly.dev/): two trained checkpoints served from a single small shared CPU machine that sleeps when idle (the first visit waits ~12 seconds while it wakes, then it's quick). Its deployment recipe — Dockerfile and `fly.toml` — is public in the worked-example repo's [`deploy/`](https://github.com/aroughidea/autoresearch-win-rtx/tree/master/deploy) folder if you want to host your own result the same way. So choose your path below on GPU access alone; whatever you train will run anywhere afterwards.
+
 ---
 
 ## 1. Windows + NVIDIA locally — the primary path
