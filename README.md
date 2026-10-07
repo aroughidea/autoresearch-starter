@@ -14,6 +14,7 @@ Train your own small language model tonight — on the gaming PC you already own
 - **`prepare.py`** — data download, tokenizer, dataloader, evaluation, and the fixed rules (5-minute time budget, eval method). **Off-limits during experiments** — it's the referee, and you don't let experiments edit the referee.
 - **`program.md`** — the research program: the instructions an agent reads and executes. Works out of the box; rewriting it is the endgame (see [Swap out parts](#swap-out-parts--make-it-yours)).
 - **`results.tsv`** — your scoreboard. Starts empty; gains one row per experiment: score, VRAM, keep/discard, description.
+- **`capture.py`** and **`runs/`** — every experiment saves what your model wrote at 0, 10, 30, 60 and 120 seconds and at the end, as a small JSON file in `runs/`. Load the folder into the Training Decisions explorer to watch your models grow and compare them. **Off-limits during experiments**, like `prepare.py`.
 - **`chat.py`** — a local browser UI to chat with your trained models and compare checkpoints side by side.
 - **`analysis.ipynb`** — a notebook that charts `results.tsv`: score over time, keeps vs discards, top improvements.
 - **`cloud/`** — the no-GPU path: a Colab notebook that runs the same loop on a free cloud GPU.
