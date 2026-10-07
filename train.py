@@ -31,6 +31,7 @@ from prepare import (
     evaluate_bpb,
     make_dataloader,
 )
+from capture import RunCapture, recipe_from, runs_dir_from_env
 
 # ---------------------------------------------------------------------------
 # Runtime configuration
@@ -813,6 +814,46 @@ N_KV_HEAD = 1  # MQA: all query heads share 1 KV head. None = full MHA (n_kv_hea
 EVAL_BATCH_SIZE = 8
 
 
+class LossScaler:
+    """Dynamic loss scaling for fp16 training (GPUs without bf16, e.g. RTX 20-series, T4).
+
+    Without it, small gradients round to zero in the fp16 backward pass and the
+    optimizers turn the remaining noise into full-size steps: the loss falls, then
+    climbs back toward 8-9. torch.amp.GradScaler cannot be used because the
+    embeddings are fp16 parameters, which it refuses to unscale.
+    Disabled (a no-op) under bf16.
+    """
+
+    def __init__(self, enabled, init_scale=2.0 ** 12, growth_interval=200):
+        self.enabled = enabled
+        self.scale = init_scale if enabled else 1.0
+        self.growth_interval = growth_interval
+        self.good_steps = 0
+
+    def backward(self, loss):
+        (loss * self.scale if self.enabled else loss).backward()
+
+    def unscale_and_check(self, params):
+        """Undo the scale on the gradients. False means overflow: skip this optimizer step."""
+        if not self.enabled:
+            return True
+        grads = [p.grad for p in params if p.grad is not None]
+        if not grads:
+            return True
+        torch._foreach_div_(grads, self.scale)
+        norms = torch.stack([g.float().norm() for g in grads])
+        if not torch.isfinite(norms).all():
+            for p in params:
+                p.grad = None
+            self.scale /= 2.0
+            self.good_steps = 0
+            return False
+        self.good_steps += 1
+        if self.good_steps % self.growth_interval == 0:
+            self.scale *= 2.0
+        return True
+
+
 def build_model_config(depth, vocab_size, runtime, use_activation_checkpointing=None):
     if use_activation_checkpointing is None:
         use_activation_checkpointing = runtime.use_activation_checkpointing
@@ -1049,13 +1090,14 @@ def _configure_step_kernels(runtime):
     print(f"Muon compute dtype: {MUON_COMPUTE_DTYPE} ({muon_reason})")
 
 
-def _run_training_once(runtime, tokenizer, config, device_batch_size, smoke_test):
+def _run_training_once(runtime, tokenizer, config, device_batch_size, smoke_test, capture):
     t_start = time.time()
     torch.manual_seed(42)
     torch.cuda.manual_seed(42)
     torch.set_float32_matmul_precision("high")
 
     autocast_ctx = torch.amp.autocast(device_type=runtime.device_type, dtype=runtime.amp_dtype)
+    capture.begin_attempt(autocast_ctx)
 
     with torch.device("meta"):
         model = GPT(config)
@@ -1116,8 +1158,13 @@ def _run_training_once(runtime, tokenizer, config, device_batch_size, smoke_test
     smooth_train_loss = 0.0
     total_training_time = 0.0
     step = 0
+    last_loss = None
+    loss_scaler = LossScaler(enabled=runtime.amp_dtype == torch.float16)
+    params = list(model.parameters())
 
     while True:
+        # Capture hook: runs before t0, so sampling never counts toward the time budget.
+        capture.on_step(model, total_training_time, step, last_loss)
         torch.cuda.synchronize()
         t0 = time.time()
         for _ in range(grad_accum_steps):
@@ -1125,7 +1172,7 @@ def _run_training_once(runtime, tokenizer, config, device_batch_size, smoke_test
                 loss = model(x, y)
             train_loss = loss.detach()
             loss = loss / grad_accum_steps
-            loss.backward()
+            loss_scaler.backward(loss)
             x, y, epoch = next(train_loader)
 
         progress = min(total_training_time / max(target_training_seconds, 1e-6), 1.0)
@@ -1137,7 +1184,8 @@ def _run_training_once(runtime, tokenizer, config, device_batch_size, smoke_test
             if group["kind"] == "muon":
                 group["momentum"] = muon_momentum
                 group["weight_decay"] = muon_weight_decay
-        optimizer.step()
+        if loss_scaler.unscale_and_check(params):
+            optimizer.step()
         model.zero_grad(set_to_none=True)
 
         train_loss_f = train_loss.item()
@@ -1153,6 +1201,7 @@ def _run_training_once(runtime, tokenizer, config, device_batch_size, smoke_test
         ema_beta = 0.9
         smooth_train_loss = ema_beta * smooth_train_loss + (1 - ema_beta) * train_loss_f
         debiased_smooth_loss = smooth_train_loss / (1 - ema_beta ** (step + 1))
+        last_loss = debiased_smooth_loss
         pct_done = 100 * progress
         tok_per_sec = int(TOTAL_BATCH_SIZE / dt)
         if runtime.gpu_peak_flops:
@@ -1185,6 +1234,7 @@ def _run_training_once(runtime, tokenizer, config, device_batch_size, smoke_test
             break
 
     print()
+    capture.on_train_end(model, total_training_time, step, last_loss)
     return {
         "model": model,
         "num_params": num_params,
@@ -1231,6 +1281,12 @@ def main():
     vocab_size = tokenizer.get_vocab_size()
     print(f"Vocab size: {vocab_size:,}")
     print(f"Dataset: {tokenizer.dataset}")
+    capture = RunCapture(
+        tokenizer,
+        dataset=tokenizer.dataset,
+        runs_dir=runs_dir_from_env(args.smoke_test),
+        device=runtime.device,
+    )
 
     # Configure optimizer kernels/dtypes before autotune so probes match real training runtime.
     _configure_step_kernels(runtime)
@@ -1265,6 +1321,7 @@ def main():
                 config=config,
                 device_batch_size=train_batch_size,
                 smoke_test=args.smoke_test,
+                capture=capture,
             )
             chosen_train_batch = train_batch_size
             chosen_checkpointing = use_checkpointing
@@ -1357,6 +1414,14 @@ def main():
     print(f"activation_checkpointing: {'enabled' if chosen_checkpointing else 'disabled'}")
     if args.smoke_test:
         print("smoke_test:       true")
+    capture.finish(
+        val_bpb=val_bpb,
+        peak_vram_mb=peak_vram_mb,
+        training_seconds=total_training_time,
+        num_steps=step,
+        num_params=num_params,
+        recipe=recipe_from(globals(), config),
+    )
     return 0
 
 

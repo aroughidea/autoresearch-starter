@@ -1,15 +1,14 @@
 # Hardware paths
 
-You do not need a specific machine to do this project — you need to pick the right path for the machine you have. There are four.
+You do not need a specific machine to do this project — you need to pick the right path for the machine you have. There are three.
 
 | Path | You have | Cost | Overnight autonomy? |
 |---|---|---|---|
 | [1. Windows + NVIDIA](#1-windows--nvidia-locally--the-primary-path) | A gaming/workstation PC | Free | Yes |
 | [2. macOS](#2-macos--use-a-sibling-fork) | A Mac | Free | Yes (different repo) |
-| [3. No GPU](#3-no-gpu-at-all--the-colab-path) | Any laptop + browser | Free | No (1–3 h sessions) |
-| [4. Rented GPU pod](#4-overnight-autonomy-without-local-hardware--rent-a-pod) | Any laptop + ~$5–10 | ~$0.20–0.60/hr | Yes |
+| [3. Rented GPU pod](#3-overnight-autonomy-without-local-hardware--rent-a-pod) | Any laptop + ~$5–10 | ~$0.20–0.60/hr | Yes |
 
-**One thing the table doesn't have to cover: serving.** All four rows are about *training*, which is where the hardware requirements live. Running the finished model is cheap on every path — these models are ~19M parameters, so `chat.py` serves them on a plain CPU with no GPU anywhere in the picture. The existence proof is the live demo, [autoresearch-demo.fly.dev](https://autoresearch-demo.fly.dev/): two trained checkpoints served from a single small shared CPU machine that sleeps when idle (the first visit waits ~12 seconds while it wakes, then it's quick). Its deployment recipe — Dockerfile and `fly.toml` — is public in the worked-example repo's [`deploy/`](https://github.com/aroughidea/autoresearch-win-rtx/tree/master/deploy) folder if you want to host your own result the same way. So choose your path below on GPU access alone; whatever you train will run anywhere afterwards.
+**One thing the table doesn't have to cover: serving.** All three rows are about *training*, which is where the hardware requirements live. Running the finished model is cheap on every path — these models are ~19M parameters, so `chat.py` serves them on a plain CPU with no GPU anywhere in the picture. The existence proof is the live demo, [autoresearch-demo.fly.dev](https://autoresearch-demo.fly.dev/): two trained checkpoints served from a single small shared CPU machine that sleeps when idle (the first visit waits ~12 seconds while it wakes, then it's quick). Its deployment recipe — Dockerfile and `fly.toml` — is public in the worked-example repo's [`deploy/`](https://github.com/aroughidea/autoresearch-win-rtx/tree/master/deploy) folder if you want to host your own result the same way. So choose your path below on GPU access alone; whatever you train will run anywhere afterwards.
 
 ---
 
@@ -52,24 +51,7 @@ The good news: the upstream author maintains a "notable forks" list, and two Mac
 
 ---
 
-## 3. No GPU at all — the Colab path
-
-The `cloud/` folder contains a Colab notebook that runs this same repo on a free cloud GPU.
-
-**Requirements:** a Google account and a browser. That's the whole list.
-
-**Cost:** free — Colab's free tier provides an NVIDIA T4 (16 GB), comfortably above the VRAM floor.
-
-**What changes:**
-
-- Open the notebook in `cloud/` via Colab, point it at **your copy** of this template (created with "Use this template"), and run the cells — they clone your repo, install dependencies, and run the same `prepare.py` / `train.py` loop.
-- **Sessions are 1–3 hours**, not overnight: the free tier disconnects idle or long-running sessions, and the runtime's disk vanishes when it ends. Plan sessions like lab slots — run 5–15 experiments, then stop.
-- **Push results before the session ends.** Commit `results.tsv` and `train.py` changes back to your GitHub repo every few experiments (the notebook shows how). Anything unpushed when the runtime dies is gone.
-- A T4 is slower than most desktop RTX cards, so expect higher `val_bpb` per 5-minute run. Comparisons within your own Colab history remain fair.
-
----
-
-## 4. Overnight autonomy without local hardware — rent a pod
+## 3. Overnight autonomy without local hardware — rent a pod
 
 Want the real unattended-overnight experience with no local GPU? Rent a Linux GPU pod by the hour: [RunPod](https://www.runpod.io/), [Lambda](https://lambda.ai/), [Vast.ai](https://vast.ai/), and similar.
 
