@@ -17,7 +17,6 @@ Train your own small language model tonight — on the gaming PC you already own
 - **`capture.py`** and **`runs/`** — every experiment saves what your model wrote at 0, 10, 30, 60 and 120 seconds and at the end, as a small JSON file in `runs/`. Load the folder into the Training Decisions explorer to watch your models grow and compare them. **Off-limits during experiments**, like `prepare.py`.
 - **`chat.py`** — a local browser UI to chat with your trained models and compare checkpoints side by side.
 - **`analysis.ipynb`** — a notebook that charts `results.tsv`: score over time, keeps vs discards, top improvements.
-- **`cloud/`** — the no-GPU path: a Colab notebook that runs the same loop on a free cloud GPU.
 
 ## Quickstart (Windows + NVIDIA)
 
@@ -206,7 +205,7 @@ Your trained model ships with its own server — `chat.py` — instead of loadin
 - **Worked example** — [aroughidea/autoresearch-win-rtx](https://github.com/aroughidea/autoresearch-win-rtx) is the live repo this template was extracted from: real `results.tsv` history, kept and discarded experiments, and a full session walkthrough in `WALKTHROUGH.md`.
 - **Karpathy's own session** — branch [`exp/H100/mar8`](https://github.com/karpathy/autoresearch/tree/exp/H100/mar8) on karpathy/autoresearch: ~125 experiments run overnight on an H100. Read the log like a paper: what did the agent try, what stuck? His project announcement is [here](https://x.com/karpathy/status/2029701092347630069).
 - **New to neural networks?** — karpathy's README points beginners at this ["Dummy's Guide"](https://x.com/hooeem/status/2030720614752039185) for the background this README assumes.
-- **Different hardware?** — [HARDWARE.md](HARDWARE.md): macOS forks, the free Colab path, and renting a GPU pod for ~$5/night.
+- **Different hardware?** — [HARDWARE.md](HARDWARE.md): macOS forks, and renting a GPU pod for ~$5/night.
 
 ### Credits
 
