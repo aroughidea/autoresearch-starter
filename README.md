@@ -181,7 +181,7 @@ uv run prepare.py --dataset tinystories --tokenizer gpt2    # GPT-2 vocabulary (
 uv run prepare.py --dataset tinystories --tokenizer own     # back to the default: a vocabulary built from the data
 ```
 
-The pair you prepare last is active for training, `generate.py` and `chat.py`, and every run file records it. Scores compare across tokenizers on the same dataset, never across datasets: start a fresh `results.tsv` when you switch dataset.
+The pair you prepare last is active for training, `generate.py` and `chat.py`, and every run file records it. Scores compare across tokenizers on the same dataset, never across datasets: start a fresh `results.tsv` when you switch dataset. Phi-3 scores about 0.1% low: it counts one extra byte per document for its word-boundary marker, so treat differences smaller than that as ties.
 
 To add your own text (poetry, code, your own writing), add an entry to `DATASET_CONFIGS` and its name to `DATASET_CHOICES` in `prepare.py`.
 
