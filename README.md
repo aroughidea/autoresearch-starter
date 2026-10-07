@@ -1,12 +1,12 @@
 # autoresearch-starter
 
-Train your own small language model tonight — on the gaming PC you already own — and let an AI agent (or you) be the researcher. The loop is simple: change one thing in the training code, train for exactly 5 minutes, check the score, keep or revert, repeat. Run it by hand and you're doing real empirical ML research. Point a coding agent at `program.md` and it runs the same loop unattended for hours while you sleep. Either way, you end up with a model you trained, a scoreboard of every experiment, and a git history that *is* your lab notebook.
+Train your own small language model tonight — on the gaming PC you already own, or a rented GPU — and let an AI agent be the researcher. You choose the dataset and the tokenizer; the agent changes the training code, trains for exactly 5 minutes, checks the score, keeps or reverts, and repeats, unattended, while you sleep. In the morning you have models you trained, a record of what each one wrote as it learned, a scoreboard of every experiment, and a git history that *is* your lab notebook. The point is to see how design decisions — the data, the tokens, the recipe the agent evolves — change what a model writes.
 
-**See it first — nothing to install.** The thing you are about to build is already running here: **[autoresearch-demo.fly.dev](https://autoresearch-demo.fly.dev/)**. It serves two models from one real research session — the starting baseline and the best configuration that session found — side by side, so you can hand both the same prompt and read the difference. It is the same browser UI (`chat.py`) this kit ships with, alongside that session's 16-experiment progress chart and a browser for the tokenizer's vocabulary. Free, public, no login. Note what these are: text-completion models, not chat assistants — type the start of a story and they continue it. And one honest caveat: the demo lives on a small machine that sleeps when nobody is visiting, so the *first* page load waits about 12 seconds while it wakes (you get the page, not an error); after that pages come back in a fraction of a second.
+**See it first — nothing to install.** The thing you are about to build is already running here: **[autoresearch-demo.fly.dev](https://autoresearch-demo.fly.dev/)**. It serves two models from one real research session — the starting baseline and the best configuration that session found — side by side, so you can hand both the same prompt and read the difference. It is the same browser UI (`chat.py`) this kit ships with, alongside that session's 16-experiment progress chart and a browser for the tokenizer's vocabulary. Free, public, no login. Note what these are: text-completion models, not chat assistants — type the start of a story and they continue it. And notice that the two read almost alike: that session's whole gain was smaller than the difference between two runs of the same code, which is why the agent judges by a score. And one honest caveat: the demo lives on a small machine that sleeps when nobody is visiting, so the *first* page load waits about 12 seconds while it wakes (you get the page, not an error); after that pages come back in a fraction of a second.
 
 **This is a template repository.** On GitHub, click the green **"Use this template"** button → **"Create a new repository"** to get your own copy under your account. Do **not** fork it and do not clone this repo directly — your experiment history is going to live in git commits, and those belong in *your* repo, not this one.
 
-> Based on [karpathy/autoresearch](https://github.com/karpathy/autoresearch), via the Windows/consumer-GPU port [jsegov/autoresearch-win-rtx](https://github.com/jsegov/autoresearch-win-rtx). No NVIDIA GPU? No Windows? See [HARDWARE.md](HARDWARE.md) — there is a path for every machine, including none.
+> Based on [karpathy/autoresearch](https://github.com/karpathy/autoresearch), via the Windows/consumer-GPU port [jsegov/autoresearch-win-rtx](https://github.com/jsegov/autoresearch-win-rtx). No NVIDIA GPU? No Windows? See [HARDWARE.md](HARDWARE.md): your own NVIDIA GPU, a Mac (through a sibling fork), or a GPU rented by the hour.
 
 ## What you get
 
@@ -14,8 +14,8 @@ Train your own small language model tonight — on the gaming PC you already own
 - **`prepare.py`** — data download, tokenizer, dataloader, evaluation, and the fixed rules (5-minute time budget, eval method). **Off-limits during experiments** — it's the referee, and you don't let experiments edit the referee.
 - **`program.md`** — the research program: the instructions an agent reads and executes. Works out of the box; rewriting it is the endgame (see [Swap out parts](#swap-out-parts--make-it-yours)).
 - **`results.tsv`** — your scoreboard. Starts empty; gains one row per experiment: score, VRAM, keep/discard, description.
-- **`capture.py`** and **`runs/`** — every experiment saves what your model wrote at 0, 10, 30, 60 and 120 seconds and at the end, as a small JSON file in `runs/`. Load the folder into the Training Decisions explorer to watch your models grow and compare them. **Off-limits during experiments**, like `prepare.py`.
-- **`chat.py`** — a local browser UI to chat with your trained models and compare checkpoints side by side.
+- **`capture.py`** and **`runs/`** — every experiment saves what your model wrote at 0, 10, 30, 60 and 120 seconds and at the end, as a small JSON file in `runs/`. A browser explorer for these files is planned; until then, open one to watch a model go from noise to stories. **Off-limits during experiments**, like `prepare.py`.
+- **`chat.py`** — a local browser page that runs two of your trained models side by side on the same prompt, with the score chart.
 - **`analysis.ipynb`** — a notebook that charts `results.tsv`: score over time, keeps vs discards, top improvements.
 
 ## Quickstart (Windows + NVIDIA)
@@ -40,7 +40,7 @@ uv run prepare.py
 # 3. Fast end-to-end sanity check (~1 min)
 uv run train.py --smoke-test
 
-# 4. Your first real experiment (~5 min of training)
+# 4. Your first real experiment (~8 min: 5 of training, then scoring)
 uv run train.py
 ```
 
@@ -48,10 +48,10 @@ A successful run ends with a summary block whose first line is your score:
 
 ```
 ---
-val_bpb:          0.818245
+val_bpb:          0.520082
 ```
 
-`val_bpb` is "validation bits per byte" — how surprised the model is by text it has never seen. **Lower is better.** An untrained model scores ~3.2 (that's what the smoke test prints, since it barely trains); after 5 minutes you should be well under 1; improvements of 0.01–0.05 between runs are meaningful.
+`val_bpb` is "validation bits per byte" — how surprised the model is by text it has never seen. **Lower is better.** An untrained model scores ~3.2 (that's what the smoke test prints, since it barely trains); after 5 minutes on a laptop RTX 4000 Ada it scores about 0.52. Two runs of the same code differ by about 0.003, so treat smaller differences as ties.
 
 **Meet your model:**
 
@@ -59,11 +59,11 @@ val_bpb:          0.818245
 uv run chat.py
 ```
 
-Open `http://localhost:8000` and type a prompt. The default dataset is [TinyStories](https://huggingface.co/datasets/karpathy/tinystories-gpt4-clean) (GPT-4-written children's stories), so your model will continue any prompt in bedtime-story style. It will be charmingly clumsy at first. Making it less clumsy is the whole game.
+Open `http://localhost:8000` and type a prompt. The default dataset is [TinyStories](https://huggingface.co/datasets/karpathy/tinystories-gpt4-clean) (GPT-4-written children's stories), so your model will continue any prompt in bedtime-story style. It will be charmingly clumsy. What makes it less clumsy — the data, the tokens, the recipe — is what this kit lets you explore.
 
 ## Run the research loop
 
-The loop is the same whether a human or an agent runs it:
+An AI agent runs this loop for you, all night:
 
 ```mermaid
 flowchart TD
@@ -79,19 +79,14 @@ flowchart TD
     H --> C
 ```
 
-### Human mode — be the researcher yourself
+### Before you start
 
-You don't need an agent. `program.md` is a complete protocol; follow it by hand:
+- **A coding agent and an account for it.** Claude Code needs a Claude Pro or Max plan or Anthropic API billing; Codex CLI needs a ChatGPT plan or OpenAI API billing. A night of experiments uses a lot of a plan's allowance, and hitting a usage limit ends the run early.
+- **Node.js**, which the agents' installers (`npm install -g ...`) need: [nodejs.org](https://nodejs.org/).
+- **A PC that stays awake.** Windows Settings → System → Power → set sleep to *Never* while plugged in, for the night.
+- **Your dataset and tokenizer prepared** (`uv run prepare.py`, see [Swap the dataset or the tokenizer](#swap-the-dataset-or-the-tokenizer)). The agent never changes them.
 
-1. Run `uv run train.py` unchanged once to establish your **baseline** score. Log it in `results.tsv`.
-2. Change **one thing** in `train.py` — a constant like `DEPTH`, a learning rate, `WINDOW_PATTERN`. One change per experiment, so you know what caused what.
-3. Run `uv run train.py`. Compare `val_bpb` to your current best.
-4. **Improved?** `git commit` the change and log a `keep` row. **Worse?** Revert (`git checkout -- train.py`) and log a `discard` row. Log crashes too — a crash you recorded is data; a crash you forgot is a repeat.
-5. Go to 2.
-
-Ten runs is an evening and enough to genuinely learn how these knobs behave. Do this before agent mode at least once — you will supervise the agent much better once you've felt the loop yourself.
-
-### Agent mode — direct the researcher
+### Start the agent
 
 Any coding agent that can read files, edit code, and run terminal commands works. The starting prompt is always:
 
@@ -129,7 +124,14 @@ codex exec -s danger-full-access "Read program.md, do setup checks, and start a 
 # More cautious: -s workspace-write auto-approves edits but asks before shell commands
 ```
 
-**To stop either:** press **Ctrl+C**. The agent commits after every experiment, so interrupting is always safe — `results.tsv` and git stay consistent. Expect roughly **7–10 experiments per hour** depending on your GPU (eval overhead varies); an overnight 8-hour session is ~55–80 experiments. Come back, open `results.tsv`, read what your researcher found.
+**To stop either:** press **Ctrl+C**. The agent commits after every experiment, so interrupting is always safe — `results.tsv` and git stay consistent. Expect about **6 experiments an hour** (each takes 8–11 minutes: 5 of training, then scoring), so an 8-hour night is about 50–60.
+
+### In the morning
+
+1. **`results.tsv`** — every experiment: what the agent tried, the score, keep or discard. Differences under about 0.003 are ties.
+2. **`uv run chat.py`**, then `http://localhost:8000` — the score chart, and two of your models side by side on the same prompt. Ask: does the writing differ, and why?
+3. **`runs/`** — one file per experiment with what the model wrote at 0, 10, 30, 60 and 120 seconds and at the end. Open one and watch it learn.
+4. **`git log --oneline`** — the lab notebook. `git push` shares the whole night.
 
 ## Troubleshooting the real failure modes
 
@@ -144,7 +146,7 @@ uv sync
 Fix, in order: (1) update your NVIDIA driver and confirm `nvidia-smi` shows your GPU; (2) make sure PyTorch came from `uv sync` — this repo pins CUDA wheels via its own PyTorch index in `pyproject.toml`. If you ever `pip install torch` manually you'll get the CPU-only build; delete `.venv` and re-run `uv sync`.
 
 **VRAM floor warning at startup.**
-The script checks the floor (Turing 8 GB+, Ampere/Ada/Blackwell 10 GB+). Below floor, runs will likely crash with out-of-memory errors mid-training. The built-in autotuner already picks the largest batch size that fits — there's little headroom to recover by hand. Below-floor GPU? Use the cloud path in [HARDWARE.md](HARDWARE.md).
+The script checks the floor (Turing 8 GB+, Ampere/Ada/Blackwell 10 GB+). Below floor, runs will likely crash with out-of-memory errors mid-training. The built-in autotuner already picks the largest batch size that fits — there's little headroom to recover by hand. Below-floor GPU? Rent one by the hour: see [HARDWARE.md](HARDWARE.md).
 
 **"My scores are worse than the walkthrough's."**
 Not a bug. Training runs for a fixed **5 minutes of wall-clock time**, so a slower GPU simply completes fewer steps and lands at a higher `val_bpb`. Correctness is unaffected, and comparisons *within your own machine's history* — the only comparisons the loop needs — are perfectly fair. Never compare absolute scores across different hardware.
@@ -155,20 +157,6 @@ It is **tab**-separated, not comma-separated — descriptions contain commas, an
 ## Swap out parts — make it yours
 
 This is the heart of the kit. Everything above is the default configuration; none of it is sacred.
-
-### The seven knobs (karpathy's own list for small computers)
-
-From the upstream author's guidance on tuning autoresearch for machines far smaller than an H100:
-
-1. **Use a low-entropy dataset.** Narrow-scope text (like TinyStories) lets small models produce visibly reasonable samples. *Already the default in this kit — knob 1 is pre-turned for you.*
-2. **Decrease `VOCAB_SIZE`** (in `prepare.py`): 8192 → 4096, 2048, 1024 — or go all the way to a byte-level tokenizer (256 tokens). Re-run `uv run prepare.py` after changing it, since the tokenizer must be retrained.
-3. **Lower `MAX_SEQ_LEN`** (in `prepare.py`), even down to 256, and compensate with a slightly larger per-device batch size (this kit autotunes that per GPU — see the candidate lists in `train.py`).
-4. **Decrease `EVAL_TOKENS`** (in `prepare.py`) so validation runs on less data and eats less of your run.
-5. **`DEPTH`** (in `train.py`) is the single primary knob for model complexity — most other sizes derive from it. Try lowering it to 4.
-6. **`WINDOW_PATTERN`** (in `train.py`): plain `"L"` (full attention everywhere) may beat the banded patterns like `"SSSL"` on small GPUs. Try it.
-7. **Lower `TOTAL_BATCH_SIZE`** (in `train.py`) — a lot, but keep it a power of 2, e.g. down to `2**14`.
-
-Knobs 2–4 live in `prepare.py`, which experiments must not touch — but *you*, between sessions, absolutely may. Changing them (or anything in `prepare.py`) resets the meaning of your scores: start a fresh `results.tsv` so the log stays coherent.
 
 ### Swap the dataset or the tokenizer
 
@@ -206,6 +194,35 @@ Your trained model ships with its own server — `chat.py` — instead of loadin
 
 ## Going further
 
+### Run the loop by hand (stretch goal)
+
+The agent is the default, but `program.md` is a complete protocol you can follow by hand, which is a good way to see what the agent is deciding:
+
+1. Run `uv run train.py` unchanged once to establish your **baseline** score. Log it in `results.tsv`.
+2. Change **one thing** in `train.py` — a constant like `DEPTH`, a learning rate, `WINDOW_PATTERN`. One change per experiment, so you know what caused what.
+3. Run `uv run train.py`. Compare `val_bpb` to your current best.
+4. **Improved?** `git commit` the change and log a `keep` row. **Worse?** Revert (`git checkout -- train.py`) and log a `discard` row. Log crashes too — a crash you recorded is data; a crash you forgot is a repeat.
+5. Go to 2.
+
+Ten runs is an evening. Archive a kept model by hand (copy `checkpoint_pre_eval.pt` into `checkpoints/`) if you want to compare it in `chat.py` later.
+
+### Hand-tuning: the seven knobs (stretch goal)
+
+From the upstream author's guidance on tuning autoresearch for machines far smaller than an H100:
+
+1. **Use a low-entropy dataset.** Narrow-scope text (like TinyStories) lets small models produce visibly reasonable samples. *Already the default in this kit — knob 1 is pre-turned for you.*
+2. **Decrease `VOCAB_SIZE`** (in `prepare.py`; it sizes the `own` tokenizer only): 8192 → 4096, 2048, 1024. Delete that dataset's `tokenizer` folder in the cache and re-run `uv run prepare.py`, since the tokenizer must be retrained. For a standard vocabulary instead, use `--tokenizer`.
+3. **Lower `MAX_SEQ_LEN`** (in `prepare.py`), even down to 256, and compensate with a slightly larger per-device batch size (this kit autotunes that per GPU — see the candidate lists in `train.py`).
+4. **Decrease `EVAL_TOKENS`** (in `prepare.py`) so validation runs on less data and eats less of your run.
+5. **`DEPTH`** (in `train.py`) is the single primary knob for model complexity — most other sizes derive from it. Try lowering it to 4.
+6. **`WINDOW_PATTERN`** (in `train.py`): plain `"L"` (full attention everywhere) may beat the banded patterns like `"SSSL"` on small GPUs. Try it.
+7. **Lower `TOTAL_BATCH_SIZE`** (in `train.py`) — a lot, but keep it a power of 2, e.g. down to `2**14`.
+
+Knobs 2–4 live in `prepare.py`, which experiments must not touch — but *you*, between sessions, absolutely may. Changing them (or anything in `prepare.py`) resets the meaning of your scores: start a fresh `results.tsv` so the log stays coherent.
+
+### More to read
+
+- **What this demonstrates** — [TRAINING-DECISIONS.md](https://github.com/aroughidea/autoresearch-win-rtx/blob/master/TRAINING-DECISIONS.md) in the worked example: the learning goals, and what each decision changes, in plain language.
 - **Worked example** — [aroughidea/autoresearch-win-rtx](https://github.com/aroughidea/autoresearch-win-rtx) is the live repo this template was extracted from: real `results.tsv` history, kept and discarded experiments, and a full session walkthrough in `WALKTHROUGH.md`.
 - **Karpathy's own session** — branch [`exp/H100/mar8`](https://github.com/karpathy/autoresearch/tree/exp/H100/mar8) on karpathy/autoresearch: ~125 experiments run overnight on an H100. Read the log like a paper: what did the agent try, what stuck? His project announcement is [here](https://x.com/karpathy/status/2029701092347630069).
 - **New to neural networks?** — karpathy's README points beginners at this ["Dummy's Guide"](https://x.com/hooeem/status/2030720614752039185) for the background this README assumes.
@@ -215,6 +232,6 @@ Your trained model ships with its own server — `chat.py` — instead of loadin
 
 - [Andrej Karpathy](https://github.com/karpathy) — the original [autoresearch](https://github.com/karpathy/autoresearch) and [nanochat](https://github.com/karpathy/nanochat), which the training code simplifies.
 - [jsegov](https://github.com/jsegov) — the [Windows/consumer-GPU port](https://github.com/jsegov/autoresearch-win-rtx) with tiered VRAM floors.
-- [aroughidea](https://github.com/aroughidea) — `chat.py`, the cloud path, and this starter packaging.
+- [aroughidea](https://github.com/aroughidea) — `chat.py`, run capture, the dataset and tokenizer choices, and this starter packaging.
 
 License: MIT — see [LICENSE](LICENSE).

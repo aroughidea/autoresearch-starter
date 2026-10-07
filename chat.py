@@ -555,7 +555,7 @@ _HTML = """\
           <span class="value" id="max-tokens-val">500</span>
         </div>
         <input type="range" id="max-tokens" min="20" max="500" step="10" value="500">
-        <div class="param-hint">How many words to generate</div>
+        <div class="param-hint">How many tokens (word pieces) to generate</div>
       </div>
 
       <div>
@@ -573,7 +573,7 @@ _HTML = """\
           <span class="value" id="top-k-val">0</span>
         </div>
         <input type="range" id="top-k" min="0" max="200" step="5" value="0">
-        <div class="param-hint">Word choices considered &mdash; 0 means all</div>
+        <div class="param-hint">Next-token choices considered &mdash; 0 means all</div>
       </div>
 
     </div>

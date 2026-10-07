@@ -65,7 +65,10 @@ Want the real unattended-overnight experience with no local GPU? Rent a Linux GP
 - The workflow is a round trip through GitHub, and this is the punchline of the whole design — **the repo IS the lab state**. `train.py` at HEAD is your best configuration, `results.tsv` is the complete scorecard, the commit log is the experiment history. There is no database, no separate state, nothing to back up. So "moving your lab to the cloud" is just:
 
   1. On the pod: `git clone` **your copy** of the repo, `uv sync`, `uv run prepare.py`, `uv run train.py --smoke-test`.
-  2. Launch the agent loop exactly as in the README (the unattended commands work verbatim, minus `Tee-Object`).
+  2. Launch the agent loop as in the README, with three differences on a pod:
+     - **Keep it running after you disconnect:** start it inside `tmux` (`tmux new -s night`, then the agent command; detach with Ctrl+B then D). Closing an SSH session otherwise ends everything started in it.
+     - **Sign the agent in without a browser:** for Claude Code, run `claude setup-token` on your own computer and set the token it prints as `CLAUDE_CODE_OAUTH_TOKEN` on the pod; or use an API key. Treat either like a password.
+     - **Let the pod push to your repo:** a fine-grained GitHub token for your copy only, with *Contents: read and write*.
   3. In the morning: `git push` from the pod, **stop the pod**, `git pull` on your laptop. Your entire night of research — every kept change, every logged experiment — is now local, as if the machine had been under your desk.
 
 - Scores from the pod's GPU are not comparable to scores from any other GPU. If you switch hardware mid-project, keep comparing only within contiguous same-hardware stretches of `results.tsv` — or start a fresh log and treat it as a new campaign.
