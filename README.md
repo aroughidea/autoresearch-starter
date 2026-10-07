@@ -170,16 +170,20 @@ From the upstream author's guidance on tuning autoresearch for machines far smal
 
 Knobs 2–4 live in `prepare.py`, which experiments must not touch — but *you*, between sessions, absolutely may. Changing them (or anything in `prepare.py`) resets the meaning of your scores: start a fresh `results.tsv` so the log stays coherent.
 
-### Swap the dataset
+### Swap the dataset or the tokenizer
 
-Open `prepare.py` and find `DATASET_CONFIGS` near the top. Add an entry: a short name, a URL to a Hugging Face parquet file, and row ranges for the test/val/train splits. Also add the same short name to the `DATASET_CHOICES` tuple just above it — `--dataset` validates against that list and will reject your name otherwise. Then:
+Two datasets and three tokenizers are built in. Choosing them is your decision, not the agent's:
 
 ```powershell
-uv run prepare.py --dataset your-name        # download + retrain tokenizer
-uv run train.py  --dataset your-name         # or set AUTORESEARCH_DATASET=your-name
+uv run prepare.py --dataset folktales                       # folk and myth tales instead of TinyStories
+uv run prepare.py --dataset tinystories --tokenizer phi3    # Phi-3 / Llama 2 vocabulary (32,011 tokens)
+uv run prepare.py --dataset tinystories --tokenizer gpt2    # GPT-2 vocabulary (50,257); needs about 10 GB of GPU memory
+uv run prepare.py --dataset tinystories --tokenizer own     # back to the default: a vocabulary built from the data
 ```
 
-Poetry, code, song lyrics, your own writing — anything with enough text works. Scores across datasets are not comparable; fresh `results.tsv`.
+The pair you prepare last is active for training, `generate.py` and `chat.py`, and every run file records it. Scores compare across tokenizers on the same dataset, never across datasets: start a fresh `results.tsv` when you switch dataset.
+
+To add your own text (poetry, code, your own writing), add an entry to `DATASET_CONFIGS` and its name to `DATASET_CHOICES` in `prepare.py`.
 
 ### The headline swap: rewrite `program.md`
 
