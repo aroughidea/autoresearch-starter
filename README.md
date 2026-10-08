@@ -63,7 +63,7 @@ Open `http://localhost:8000` and type a prompt. The default dataset is [TinyStor
 
 ## Run the research loop
 
-An AI agent runs this loop for you, all night:
+An AI agent runs this loop for you until its session budget runs out: 8 hours unless you set another (add "Run for 4 hours." to the prompt). Each pass trains a new model from scratch with the changed recipe; only the recipe carries forward, so the models get better because the recipe does.
 
 ```mermaid
 flowchart TD
@@ -74,9 +74,11 @@ flowchart TD
     E -->|keep| F["git commit the change\nappend keep row to results.tsv"]
     E -->|discard| G["revert train.py\nappend discard row to results.tsv"]
     E -->|crash| H["record crash in results.tsv\nrestore last working state"]
-    F --> C
-    G --> C
-    H --> C
+    F --> T{"Time left in the session budget?"}
+    G --> T
+    H --> T
+    T -->|yes| C
+    T -->|no| Z["Log the last run, commit, write a summary, stop"]
 ```
 
 ### Before you start
@@ -84,6 +86,7 @@ flowchart TD
 - **A coding agent and an account for it.** Claude Code needs a Claude Pro or Max plan or Anthropic API billing; Codex CLI needs a ChatGPT plan or OpenAI API billing. A night of experiments uses a lot of a plan's allowance, and hitting a usage limit ends the run early.
 - **Node.js**, which the agents' installers (`npm install -g ...`) need: [nodejs.org](https://nodejs.org/).
 - **A PC that stays awake.** Windows Settings → System → Power → set sleep to *Never* while plugged in, for the night.
+- **A sign-in that lasts the night, for an unattended run.** A normal Claude Code sign-in can expire partway through a headless session, and every restart then fails until morning. Run `claude setup-token` first and set the token it prints as `CLAUDE_CODE_OAUTH_TOKEN` for the session (or use an API key). Treat either like a password.
 - **Your dataset and tokenizer prepared** (`uv run prepare.py`, see [Swap the dataset or the tokenizer](#swap-the-dataset-or-the-tokenizer)). The agent never changes them.
 
 ### Start the agent
