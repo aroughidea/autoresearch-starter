@@ -30,3 +30,6 @@ checkpoint_pre_eval.json
 
 # Run files from runs outside a session (quick tests)
 /runs/
+
+# The session runner's logs (session.py)
+/session-logs/
