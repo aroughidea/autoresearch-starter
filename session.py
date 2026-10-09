@@ -221,7 +221,7 @@ def checks(*, run_minutes, hours, env, which, signin, disk_free_gb, locked, gpu_
     out.append((not locked(), "no other session runner" if not locked() else
                 f"another session runner is running ({LOGS / 'runner.lock'}); if none is, delete that folder"))
     free = disk_free_gb()
-    out.append((free >= 20, f"disk free: {free} GB (need 20)"))
+    out.append((free >= 10, f"disk free: {free} GB (need 10)"))
     used = gpu_used_mib()
     out.append((True, "note: GPU memory in use unknown (no nvidia-smi)") if used is None else
                (used < 2048, f"GPU memory in use: {used} MiB" + ("" if used < 2048 else " (close other GPU work first)")))
@@ -291,7 +291,7 @@ def main(argv=None):
             if not same:
                 print(f"session {name} exists with another dataset, tokenizer or run length: choose another --name")
                 return 1
-            record.write_atomic(record.SESSIONS / "active.txt", name + "\n")
+            record.use_session(name)
             print(f"continuing session {name}, which ends {_ends(s):%H:%M on %A}")
         elif _run(["uv", "run", "lab.py", "start", name, "--dataset", args.dataset, "--tokenizer", args.tokenizer,
                    "--run-minutes", str(args.run_minutes), "--hours", f"{args.hours:g}"]) != 0:
