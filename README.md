@@ -90,6 +90,7 @@ A run that beats the best is kept, even if the gain is smaller than the noise; t
 - **A coding agent and an account for it.** Claude Code needs a Claude Pro or Max plan or Anthropic API billing; Codex CLI needs a ChatGPT plan or OpenAI API billing. A night of experiments uses a lot of a plan's allowance, and hitting a usage limit ends the run early.
 - **Node.js**, which the agents' installers (`npm install -g ...`) need: [nodejs.org](https://nodejs.org/).
 - **A PC that stays awake.** Windows Settings → System → Power → set sleep to *Never* while plugged in, for the night.
+- **A PC that runs at one speed all session.** Every run gets the same 10 minutes of training, so its score depends on how many training steps the GPU completes in that time. If the machine slows down partway through, the next runs score worse for reasons that have nothing to do with the recipe, and the agent cannot tell a slower machine from a worse idea. Keep a laptop plugged in; set Windows Settings → System → Power → *Power mode* to one setting for the night (and any fan or GPU utility from the laptop's maker to a fixed mode, not an automatic one); keep the vents clear; and leave the GPU to the session: no games, video calls or other apps that use it. `session.py --check` refuses to start while other programs hold 2 GB or more of the GPU's memory, but a program can slow the GPU with less, and nothing checks the power mode. See "My baseline runs disagree" below for how to check a session.
 - **A sign-in that lasts the night, for an unattended run.** A normal Claude Code sign-in can expire partway through a headless session, and every restart then fails until morning. Run `claude setup-token` first and set the token it prints as `CLAUDE_CODE_OAUTH_TOKEN` for the session (or use an API key). Treat either like a password.
 - **The recipe you want to start from in `train.py`.** The session stores it as its first version. Out of the box that is the kit's recipe.
 
@@ -162,6 +163,13 @@ Fix, in order: (1) update your NVIDIA driver and confirm `nvidia-smi` shows your
 
 **VRAM floor warning at startup.**
 The script checks the floor (Turing 8 GB+, Ampere/Ada/Blackwell 10 GB+). Below floor, runs will likely crash with out-of-memory errors mid-training. The built-in autotuner already picks the largest batch size that fits — there's little headroom to recover by hand. Below-floor GPU? Rent one by the hour: see [HARDWARE.md](HARDWARE.md).
+
+**My baseline runs disagree.**
+A session starts by training the unchanged recipe three times, and the spread of those three scores becomes the session's noise (`lab.py status` shows it). The same code on a steady machine completes about the same number of training steps each run, so check the step counts once the baseline runs are done:
+```powershell
+Select-String -Path sessions\*\runs\*.json -Pattern '"num_steps"'
+```
+In our rehearsal on a laptop, the first baseline run completed 1,193 steps and scored 0.481; the next two completed 744 each and scored 0.510. The code was the same; the machine had slowed down, and we did not find out why. That made the session's noise 0.029, thirteen times the 0.0022 of a night on the same laptop whose three baseline runs completed 1,214, 1,258 and 1,258 steps. From then on a score said as much about the machine's speed as about the recipe. The agent noticed the slowdown, but it took the normal-speed run for the outlier. If your step counts differ by much, stop the session (`uv run session.py --stop`), fix whatever slowed the machine, and start a new session with another name (`--name`); the stopped session's folder stays.
 
 **"My scores are worse than the walkthrough's."**
 Not a bug. Training runs for a fixed **10 minutes of wall-clock time**, so a slower GPU simply completes fewer steps and lands at a higher `val_bpb`. Correctness is unaffected, and comparisons *within your own machine's history* — the only comparisons the loop needs — are perfectly fair. Never compare absolute scores across different hardware.
