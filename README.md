@@ -109,9 +109,20 @@ uv run session.py tinystories own
 
 # Other choices: dataset, tokenizer, hours, run length
 uv run session.py folktales phi3 --hours 6 --run-minutes 5
+
+# Choose the agent's model (otherwise Claude Code's default)
+uv run session.py tinystories own --model claude-opus-5-5
+
+# Stop the running session, from another terminal (or press Ctrl+C in its window)
+uv run session.py --stop
+
+# Continue a session on another day, for 6 more hours
+uv run session.py --resume <name> --hours 6
 ```
 
-`session.py` prepares the dataset and tokenizer, starts the session's record (`sessions/<dataset>-<tokenizer>-<minutes>min-<date>/`), and launches the agent headless. If the agent's turn ends early it starts it again where it left off: the record holds the state, so nothing is lost. It starts no run in the session's last 20 minutes, ends the agent 25 minutes after the session's end, and stops at once if the sign-in fails. Run the same command again to continue a session that stopped. Its logs go to `session-logs/<name>/`.
+`session.py` prepares the dataset and tokenizer, starts the session's record (`sessions/<dataset>-<tokenizer>-<minutes>min-<date>/`), and launches the agent headless. If the agent's turn ends early it starts it again where it left off: the record holds the state, so nothing is lost. It starts no run in the session's last 20 minutes, ends the agent 25 minutes after the session's end, and stops at once if the sign-in fails. Its logs go to `session-logs/<name>/`.
+
+Stopping ends the agent and its training; only the run that was training is lost (the record marks it "did not finish" and keeps its code). Run the same command again the same day to continue until the session's end time, or `--resume` it on any day; either way the agent is told to continue, not to start over. The session's `session.json` records the model the agent ran with (`agent_model`), so you can tell later which model did the research.
 
 ### Start a session by hand, with any agent
 
