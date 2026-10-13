@@ -24,3 +24,12 @@ checkpoints/
 
 # What trained checkpoint_pre_eval.pt (written by train.py, read by chat.py)
 checkpoint_pre_eval.json
+
+# The experiment record: each session's folder stays on this machine (share it by copying it)
+/sessions/
+
+# Run files from runs outside a session (quick tests)
+/runs/
+
+# The session runner's logs (session.py)
+/session-logs/
